@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>星轨 · Rhythm Star</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;overflow:hidden;background:#02000a;
+    font-family:"PingFang SC","Microsoft YaHei",sans-serif;color:#fff;user-select:none;}
+  #stage{position:fixed;inset:0;}
+
+  #bg1,#bg2,#bg3{position:absolute;inset:-25%;z-index:0;filter:blur(60px);}
+  #bg1{background:radial-gradient(circle at 25% 30%,rgba(120,0,255,.4),transparent 55%);
+    animation:bgA 14s ease-in-out infinite alternate;}
+  #bg2{background:radial-gradient(circle at 75% 70%,rgba(0,200,255,.32),transparent 55%);
+    animation:bgB 18s ease-in-out infinite alternate;}
+  #bg3{background:radial-gradient(circle at 50% 100%,rgba(255,0,140,.3),transparent 60%);
+    animation:bgA 22s ease-in-out infinite alternate-reverse;}
+  @keyframes bgA{0%{transform:scale(1) rotate(0)}100%{transform:scale(1.3) rotate(10deg)}}
+  @keyframes bgB{0%{transform:scale(1.2) rotate(0)}100%{transform:scale(1) rotate(-12deg)}}
+
+  #flash{position:absolute;inset:0;z-index:1;pointer-events:none;opacity:0;
+    background:radial-gradient(circle at 50% 50%,rgba(255,255,255,.95),transparent 70%);
+    transition:opacity .1s ease-out;}
+  #vignette{position:absolute;inset:0;z-index:2;pointer-events:none;
+    background:radial-gradient(circle at 50% 50%,transparent 45%,rgba(0,0,0,.55) 100%);}
+  #canvas{position:absolute;inset:0;z-index:3;touch-action:none;}
+
+  #hud{position:absolute;top:0;left:0;right:0;z-index:6;display:flex;
+    justify-content:space-between;align-items:flex-start;padding:16px 22px;
+    pointer-events:none;text-shadow:0 0 16px rgba(160,120,255,.9);}
+  #songName{font-size:20px;font-weight:800;letter-spacing:2px;}
+  #songArtist{font-size:11px;opacity:.55;margin-top:3px;letter-spacing:1px;}
+  #scoreBox{text-align:right;}
+  #score{font-size:32px;font-weight:900;font-variant-numeric:tabular-nums;
+    background:linear-gradient(90deg,#fff,#a855f7);-webkit-background-clip:text;
+    background-clip:text;color:transparent;}
+  #combo{font-size:13px;opacity:.7;margin-top:2px;font-weight:700;letter-spacing:1px;}
+  #combo.hot{color:#ffd93b;opacity:1;text-shadow:0 0 22px #ffb800;font-size:16px;}
+
+  #accWrap{position:absolute;top:64px;left:22px;z-index:6;width:120px;pointer-events:none;}
+  #accBar{height:4px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;}
+  #accFill{height:100%;width:100%;background:linear-gradient(90deg,#00e5ff,#a855f7,#ff2e9a);
+    box-shadow:0 0 12px #a855f7;transition:width .2s;}
+  #accText{font-size:10px;opacity:.5;margin-top:3px;letter-spacing:1px;}
+
+  #judge{position:absolute;top:30%;left:50%;transform:translateX(-50%);z-index:7;
+    font-size:38px;font-weight:900;letter-spacing:5px;opacity:0;
+    pointer-events:none;white-space:nowrap;}
+
+  #progressWrap{position:absolute;bottom:0;left:0;right:0;height:3px;
+    background:rgba(255,255,255,.08);z-index:6;}
+  #progress{height:100%;width:0%;
+    background:linear-gradient(90deg,#00e5ff,#a855f7,#ff2e9a);
+    box-shadow:0 0 16px #a855f7;}
+
+  /* 暂停按钮 */
+  #pauseBtn{position:absolute;top:16px;left:50%;transform:translateX(-50%);
+    z-index:8;width:40px;height:40px;border-radius:50%;border:1px solid rgba(168,85,247,.4);
+    background:rgba(255,255,255,.06);backdrop-filter:blur(6px);cursor:pointer;
+    display:flex;align-items:center;justify-content:center;transition:all .2s;}
+  #pauseBtn:hover{background:rgba(168,85,247,.28);box-shadow:0 0 20px rgba(168,85,247,.6);}
+  #pauseBtn svg{width:16px;height:16px;fill:#fff;}
+
+  /* 暂停遮罩 */
+  #pauseOverlay{position:absolute;inset:0;z-index:15;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(3,0,12,.85);backdrop-filter:blur(12px);}
+  #pauseOverlay.show{display:flex;}
+  #pauseOverlay h2{font-size:26px;font-weight:900;letter-spacing:6px;margin-bottom:24px;
+    background:linear-gradient(90deg,#00e5ff,#a855f7,#ff2e9a);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  .pauseBtn2{padding:12px 40px;border-radius:26px;border:none;cursor:pointer;
+    font-family:inherit;font-size:14px;font-weight:700;color:#fff;letter-spacing:2px;
+    background:linear-gradient(90deg,#a855f7,#ff2e9a);margin:6px;
+    transition:transform .15s;min-width:180px;}
+  .pauseBtn2:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,46,154,.5);}
+  .pauseBtn2.ghost{background:rgba(255,255,255,.08);}
+
+  #menu{position:absolute;inset:0;z-index:20;display:flex;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(3,0,12,.9);backdrop-filter:blur(14px);padding:18px;}
+  #menu.hidden{display:none;}
+  #title{font-size:38px;font-weight:900;letter-spacing:8px;margin-bottom:4px;
+    background:linear-gradient(90deg,#00e5ff,#a855f7,#ff2e9a,#ffd93b,#00e5ff);
+    -webkit-background-clip:text;background-clip:text;color:transparent;
+    background-size:300% 100%;animation:shine 4s linear infinite;}
+  @keyframes shine{to{background-position:300% 0}}
+  #subtitle{font-size:11px;opacity:.45;letter-spacing:4px;margin-bottom:14px;}
+
+  #diffRow{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;justify-content:center;}
+  .diffBtn{padding:7px 20px;border-radius:20px;cursor:pointer;font-size:12px;
+    background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.15);
+    color:#fff;transition:all .2s;font-family:inherit;letter-spacing:1px;}
+  .diffBtn.active{background:linear-gradient(90deg,#a855f7,#ff2e9a);
+    border-color:transparent;box-shadow:0 0 22px rgba(255,46,154,.65);}
+
+  /* 分类标签 */
+  #catRow{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;justify-content:center;}
+  .catBtn{padding:5px 14px;border-radius:16px;cursor:pointer;font-size:11px;
+    background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.12);
+    color:#fff;transition:all .2s;font-family:inherit;}
+  .catBtn.active{background:rgba(0,229,255,.2);border-color:#00e5ff;color:#00e5ff;}
+
+  #songScroll{width:min(660px,94vw);max-height:46vh;overflow-y:auto;
+    padding:4px;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  #songScroll::-webkit-scrollbar{width:6px;}
+  #songScroll::-webkit-scrollbar-thumb{background:rgba(168,85,247,.5);border-radius:3px;}
+  .songBtn{background:rgba(255,255,255,.05);border:1px solid rgba(168,85,247,.3);
+    border-radius:11px;padding:10px 12px;cursor:pointer;color:#fff;text-align:left;
+    transition:all .18s;font-family:inherit;position:relative;overflow:hidden;}
+  .songBtn:hover{background:rgba(168,85,247,.24);transform:translateY(-2px);
+    box-shadow:0 8px 26px rgba(168,85,247,.45);}
+  .songBtn .t{font-size:14px;font-weight:700;padding-right:52px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .songBtn .m{font-size:10px;opacity:.5;margin-top:3px;}
+  .songBtn .lv{position:absolute;top:8px;right:10px;font-size:10px;
+    color:#ffd93b;font-weight:700;opacity:.85;}
+  .songBtn .best{font-size:10px;color:#00e5ff;margin-top:2px;opacity:.9;}
+  .songBtn .grade{position:absolute;bottom:8px;right:10px;font-size:16px;
+    font-weight:900;text-shadow:0 0 12px currentColor;}
+
+  #tips{margin-top:12px;font-size:11px;opacity:.4;line-height:1.9;text-align:center;}
+  kbd{background:rgba(255,255,255,.1);border-radius:4px;padding:1px 7px;
+    border:1px solid rgba(255,255,255,.15);font-family:monospace;font-size:10px;}
+
+  #hint{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);
+    z-index:6;font-size:11px;opacity:.35;letter-spacing:1px;}
+
+  #result{position:absolute;inset:0;z-index:25;display:none;
+    flex-direction:column;align-items:center;justify-content:center;
+    background:rgba(3,0,12,.92);backdrop-filter:blur(14px);padding:20px;text-align:center;}
+  #result.show{display:flex;}
+  #resTitle{font-size:26px;font-weight:900;letter-spacing:4px;margin-bottom:10px;
+    background:linear-gradient(90deg,#00e5ff,#a855f7,#ff2e9a);
+    -webkit-background-clip:text;background-clip:text;color:transparent;}
+  #resGrade{font-size:78px;font-weight:900;line-height:1;margin:6px 0 16px;
+    text-shadow:0 0 40px currentColor;}
+  #newRecord{font-size:12px;color:#ffd93b;letter-spacing:2px;height:16px;
+    text-shadow:0 0 14px #ffd93b;margin-bottom:8px;}
+  .resRow{display:flex;gap:24px;margin:4px 0;font-size:14px;}
+  .resRow .k{opacity:.55;}
+  .resRow .v{font-weight:700;}
+  .resStats{display:grid;grid-template-columns:1fr 1fr;gap:8px 30px;
+    margin:14px 0;font-size:13px;}
+  .resStats div{display:flex;justify-content:space-between;gap:14px;}
+  .resBtns{display:flex;gap:12px;margin-top:14px;}
+  .resBtns button{padding:10px 28px;border-radius:24px;border:none;cursor:pointer;
+    font-family:inherit;font-size:13px;font-weight:700;color:#fff;letter-spacing:1px;
+    background:linear-gradient(90deg,#a855f7,#ff2e9a);transition:transform .15s;}
+  .resBtns button:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,46,154,.5);}
+  .resBtns button.ghost{background:rgba(255,255,255,.08);}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="bg1"></div><div id="bg2"></div><div id="bg3"></div>
+  <div id="flash"></div>
+  <div id="vignette"></div>
+  <canvas id="canvas"></canvas>
+
+  <div id="hud">
+    <div>
+      <div id="songName">—</div>
+      <div id="songArtist">—</div>
+      <div id="accWrap">
+        <div id="accBar"><div id="accFill"></div></div>
+        <div id="accText">ACC 100.0%</div>
+      </div>
+    </div>
+    <div id="scoreBox">
+      <div id="score">0</div>
+      <div id="combo">COMBO 0</div>
+    </div>
+  </div>
+
+  <button id="pauseBtn" title="暂停 (P)">
+    <svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1.5"/><rect x="14" y="4" width="4" height="16" rx="1.5"/></svg>
+  </button>
+
+  <div id="judge"></div>
+  <div id="progressWrap"><div id="progress"></div></div>
+  <div id="hint">P 暂停 · R 重开 · Esc 返回</div>
+</div>
+
+<div id="pauseOverlay">
+  <h2>已暂停</h2>
+  <button class="pauseBtn2" id="pResume">继续游戏</button>
+  <button class="pauseBtn2" id="pRestart">重新开始</button>
+  <button class="pauseBtn2 ghost" id="pQuit">返回选曲</button>
+</div>
+
+<div id="menu">
+  <div id="title">星轨</div>
+  <div id="subtitle">RHYTHM STAR · 52</div>
+  <div id="diffRow">
+    <button class="diffBtn" data-diff="easy">简单</button>
+    <button class="diffBtn active" data-diff="normal">普通</button>
+    <button class="diffBtn" data-diff="hard">困难</button>
+    <button class="diffBtn" data-diff="extreme">极限</button>
+  </div>
+  <div id="catRow"></div>
+  <div id="songScroll"></div>
+  <div id="tips">
+    <kbd>D</kbd><kbd>F</kbd><kbd>J</kbd><kbd>K</kbd> 四轨 · 长按持续按住 · 滑键沿箭头滑动<br>
+    双押同时按两键 · 手机可点击/滑动 · 成绩自动存档
+  </div>
+</div>
+
+<div id="result">
+  <div id="resTitle">曲目完成</div>
+  <div id="newRecord"></div>
+  <div id="resGrade">S</div>
+  <div class="resRow"><span class="k">曲名</span><span class="v" id="resName">—</span></div>
+  <div class="resRow"><span class="k">得分</span><span class="v" id="resScore">0</span></div>
+  <div class="resStats">
+    <div><span>PERFECT</span><span id="cPerfect">0</span></div>
+    <div><span>GOOD</span><span id="cGood">0</span></div>
+    <div><span>OK</span><span id="cOk">0</span></div>
+    <div><span>MISS</span><span id="cMiss">0</span></div>
+    <div><span>最大连击</span><span id="cCombo">0</span></div>
+    <div><span>准确率</span><span id="cAcc">0%</span></div>
+  </div>
+  <div class="resBtns">
+    <button id="btnRetry">再来一次</button>
+    <button class="ghost" id="btnBack">返回选曲</button>
+  </div>
+</div>
+
+<script>
+/* =========================================================================
+   星轨 Rhythm Star  v3
+   新增：成绩存档(localStorage) / 暂停系统 / 分类曲库 / 代码优化
+   ========================================================================= */
+
+/* ============================== 1. 曲库（按文档分类） ====================
+   谱面语法：
+   [beat, lane]                    单点
+   [beat, lane, 'hold', 持续拍数]   长按
+   [beat, lane, 'slide', 目标轨]    滑键
+   [beat, [l1, l2]]                双押
+   ======================================================================== */
+const SONG_LIB = [
+  /* ---------- 华语流行 ---------- */
+  { id:'qimiao',    name:'奇妙能力歌',     artist:'陈粒',       bpm:96,  genre:'华语流行', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,0],[2.5,2],[3,1],[3.5,3],[4,0,'slide',1],[4.5,1],[5,2],[5.5,0],[6,3],[6.5,2],[7,1],[7.5,0],[8,2],[8.5,3],[9,0],[9.5,1],[10,2,'hold',2],[11,0],[11.5,3],[12,[1,0]],[12.5,0],[13,2],[13.5,1],[14,3],[14.5,2],[15,0],[15.5,1],[16,3],[16.5,2],[17,1],[17.5,0],[18,2,'slide',3],[18.5,3],[19,1],[19.5,2],[20,0],[20.5,1],[21,3],[21.5,2],[22,1],[22.5,0],[23,2],[23.5,3]] },
+  { id:'houlai',    name:'后来',           artist:'刘若英',     bpm:76,  genre:'华语流行', pattern:[[0,0],[1,2],[2,1,'hold',2],[4,3],[5,0],[6,[1,3]],[7,2],[8,0,'slide',2],[9,1],[10,3],[11,0],[12,[1,2]],[13,3],[14,0,'hold',3]] },
+  { id:'zuijia',    name:'最佳损友',       artist:'陈奕迅',     bpm:80,  genre:'华语流行', pattern:[[0,1],[1,3],[2,0,'hold',2],[4,2],[5,1],[6,[0,3]],[7,2],[8,1],[9,0],[10,3,'slide',1],[11,2],[12,[0,1]],[13,3],[14,2]] },
+  { id:'haoxiang',  name:'我好像在哪见过你',artist:'薛之谦',    bpm:88,  genre:'华语流行', pattern:[[0,0],[1,2],[2,[1,3]],[3,0],[4,2,'hold',2],[6,1],[7,3],[8,0],[9,1],[10,2,'slide',0],[11,3],[12,[1,2]],[13,0],[14,3]] },
+  { id:'moli',      name:'茉莉雨',         artist:'林俊杰',     bpm:84,  genre:'华语流行', pattern:[[0,0],[0.75,1],[1.5,2],[2.25,3],[3,[1,2]],[3.75,1],[4.5,0],[5.25,3],[6,1,'slide',2],[6.75,2],[7.5,3],[8.25,0],[9,2],[9.75,1],[10.5,[0,3]],[11.25,2]] },
+  { id:'kexi',      name:'可惜没如果',     artist:'林俊杰',     bpm:78,  genre:'华语流行', pattern:[[0,0],[1,2],[2,1],[3,3,'hold',2],[5,0],[6,1],[7,[2,3]],[8,0],[9,2,'slide',0],[10,1],[11,3],[12,[0,1]],[13,2],[14,3]] },
+  { id:'beidui',    name:'背对背拥抱',     artist:'林俊杰',     bpm:82,  genre:'华语流行', pattern:[[0,0],[1,1],[2,[2,3]],[3,0],[4,1,'hold',2],[6,3],[7,2],[8,0],[9,1],[10,2],[11,[0,3]],[12,1,'slide',2],[13,3],[14,0]] },
+  { id:'kebukeyi',  name:'可不可以',       artist:'张紫豪',     bpm:90,  genre:'华语流行', pattern:[[0,0],[1,2],[2,[1,3]],[3,0],[4,2,'hold',2],[6,1],[7,3],[8,0],[9,1],[10,2,'slide',0],[11,3],[12,[1,2]],[13,0],[14,3]] },
+  { id:'qingtian',  name:'晴天',           artist:'周杰伦',     bpm:84,  genre:'华语流行', pattern:[[0,0],[0.75,1],[1.5,2],[2.25,3],[3,1],[3.75,2],[4.5,0],[5.25,3],[6,1],[6.75,2],[7.5,3],[8.25,0],[9,2],[9.75,1],[10.5,0],[11.25,3],[12,1],[12.5,2],[13,0],[13.5,3],[14,[1,2]],[14.5,2],[15,0],[15.5,1],[16,2],[16.5,3],[17,1],[17.5,0],[18,2,'hold',2],[19,3],[19.5,2],[20,0],[20.5,1],[21,2],[21.5,3],[22,1],[22.5,0],[23,2],[23.5,1],[24,3],[24.5,2],[25,0],[25.5,1],[26,2],[26.5,3],[27,1],[27.5,0],[28,[2,1]],[28.5,1],[29,3],[29.5,2],[30,0,'slide',3],[30.5,3],[31,1],[31.5,2]] },
+  { id:'pugongying',name:'蒲公英的约定',   artist:'周杰伦',     bpm:80,  genre:'华语流行', pattern:[[0,0],[1,1],[2,2],[3,3],[4,[1,2]],[5,0],[6,3],[7,1],[8,0,'hold',2],[10,2],[11,3],[12,[0,1]],[13,2],[14,3]] },
+  { id:'yuhou',     name:'雨过后的风景',   artist:'',           bpm:86,  genre:'华语流行', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,2]],[3,1],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,1]],[7,2],[7.5,0]] },
+  { id:'yuai',      name:'雨爱',           artist:'杨丞琳',     bpm:76,  genre:'华语流行', pattern:[[0,0],[1,2],[2,1,'hold',2],[4,3],[5,0],[6,[1,3]],[7,2],[8,0,'slide',2],[9,1],[10,3],[11,0],[12,[1,2]],[13,3],[14,0,'hold',3]] },
+  { id:'weiyi',     name:'唯一',           artist:'王力宏',     bpm:84,  genre:'华语流行', pattern:[[0,0],[1,2],[2,[1,3]],[3,0],[4,2,'hold',2],[6,1],[7,3],[8,0],[9,1],[10,2,'slide',0],[11,3],[12,[1,2]],[13,0],[14,3]] },
+  { id:'hongse',    name:'红色高跟鞋',     artist:'蔡健雅',     bpm:92,  genre:'华语流行', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,0],[2.5,1],[3,2],[3.5,3],[4,[0,2]],[4.5,1],[5,3],[5.5,0],[6,2],[6.5,1],[7,[0,3]],[7.5,2]] },
+  { id:'jiaYi',     name:'甲乙丙丁',       artist:'',           bpm:88,  genre:'华语流行', pattern:[[0,0],[1,1],[2,[2,3]],[3,0],[4,1,'hold',2],[6,3],[7,2],[8,0],[9,1],[10,2],[11,[0,3]],[12,1,'slide',2],[13,3],[14,0]] },
+  { id:'aicuo',     name:'爱错',           artist:'王力宏',     bpm:72,  genre:'华语流行', pattern:[[0,0],[1,2],[2,1],[3,3],[4,[0,1]],[5,2],[6,3],[7,0],[8,1,'hold',2],[10,3],[11,0],[12,[1,2]],[13,3],[14,0]] },
+  { id:'aiwota',    name:'爱我还是他',     artist:'陶喆',       bpm:74,  genre:'华语流行', pattern:[[0,1],[1,3],[2,0,'hold',2],[4,2],[5,1],[6,[0,3]],[7,2],[8,1],[9,0],[10,3,'slide',1],[11,2],[12,[0,1]],[13,3],[14,2]] },
+  { id:'aiqing',    name:'爱情讯息',       artist:'',           bpm:90,  genre:'华语流行', pattern:[[0,0],[1,2],[2,[1,3]],[3,0],[4,2,'hold',2],[6,1],[7,3],[8,0],[9,1],[10,2,'slide',0],[11,3],[12,[1,2]],[13,0],[14,3]] },
+  { id:'wohuainian',name:'我怀念的',       artist:'孙燕姿',     bpm:76,  genre:'华语流行', pattern:[[0,0],[1,2],[2,1,'hold',2],[4,3],[5,0],[6,[1,3]],[7,2],[8,0,'slide',2],[9,1],[10,3],[11,0],[12,[1,2]],[13,3],[14,0,'hold',3]] },
+  { id:'yizhi',     name:'一直很安静',     artist:'阿桑',       bpm:70,  genre:'华语流行', pattern:[[0,0],[1,1],[2,2],[3,3],[4,[0,3]],[5,1],[6,2],[7,0],[8,1,'hold',3],[11,2],[12,3],[13,[0,1]],[14,2]] },
+  { id:'xinqiang',  name:'心墙',           artist:'郭静',       bpm:78,  genre:'华语流行', pattern:[[0,0],[1,2],[2,1,'hold',2],[4,3],[5,0],[6,[1,3]],[7,2],[8,0,'slide',2],[9,1],[10,3],[11,0],[12,[1,2]],[13,3],[14,0,'hold',3]] },
+  { id:'yigeren',   name:'一个人想着一个人',artist:'曾沛慈',    bpm:82,  genre:'华语流行', pattern:[[0,0],[1,1],[2,[2,3]],[3,0],[4,1,'hold',2],[6,3],[7,2],[8,0],[9,1],[10,2],[11,[0,3]],[12,1,'slide',2],[13,3],[14,0]] },
+  { id:'luosheng',  name:'罗生门',         artist:'',           bpm:86,  genre:'华语流行', pattern:[[0,0],[1,2],[2,[1,3]],[3,0],[4,2,'hold',2],[6,1],[7,3],[8,0],[9,1],[10,2,'slide',0],[11,3],[12,[1,2]],[13,0],[14,3]] },
+  { id:'chunjiao',  name:'春娇与志明',     artist:'',           bpm:88,  genre:'华语流行', pattern:[[0,0],[1,2],[2,1],[3,3],[4,[0,1]],[5,2],[6,3],[7,0],[8,1,'hold',2],[10,3],[11,0],[12,[1,2]],[13,3],[14,0]] },
+  { id:'xiayige',   name:'下一个天亮',     artist:'郭静',       bpm:76,  genre:'华语流行', pattern:[[0,0],[1,2],[2,1,'hold',2],[4,3],[5,0],[6,[1,3]],[7,2],[8,0,'slide',2],[9,1],[10,3],[11,0],[12,[1,2]],[13,3],[14,0,'hold',3]] },
+  { id:'celian',    name:'侧脸',           artist:'',           bpm:84,  genre:'华语流行', pattern:[[0,0],[1,1],[2,[2,3]],[3,0],[4,1,'hold',2],[6,3],[7,2],[8,0],[9,1],[10,2],[11,[0,3]],[12,1,'slide',2],[13,3],[14,0]] },
+  { id:'tianruo',   name:'天若有情',       artist:'A-Lin',      bpm:72,  genre:'华语流行', pattern:[[0,0],[1,1],[2,0],[3,2,'hold',2],[5,1],[6,3],[7,2],[8,0,'hold',2],[10,1],[11,2],[12,1],[13,3],[14,2],[15,1],[16,0],[17,2],[18,1],[19,3],[20,2,'hold',2],[22,0],[23,1],[24,[3,2]],[25,1],[26,0],[27,3],[28,2],[29,1],[30,0,'hold',3]] },
+
+  /* ---------- 纯音乐 ---------- */
+  { id:'fengyu',    name:'风屿',           artist:'',           bpm:100, genre:'纯音乐', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,2]],[3,1],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,1]],[7,2],[7.5,0]] },
+  { id:'qingya',    name:'青芽',           artist:'',           bpm:96,  genre:'纯音乐', pattern:[[0,0],[1,1],[2,2],[3,3],[4,[0,3]],[5,1],[6,2],[7,0],[8,1,'hold',2],[10,2],[11,3],[12,[0,1]],[13,2],[14,3]] },
+  { id:'water',     name:'WATER',          artist:'',           bpm:110, genre:'纯音乐', pattern:[[0,0],[0.5,2],[1,1],[1.5,3],[2,0],[2.5,2],[3,[1,3]],[3.5,0],[4,1,'slide',3],[5,2],[5.5,0],[6,3],[6.5,1],[7,[0,2]],[7.5,3]] },
+  { id:'infinity',  name:'Infinity Heaven',artist:'',           bpm:120, genre:'纯音乐', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,1]],[3,2],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,2]],[7,1],[7.5,3]] },
+  { id:'chronomia', name:'Chronomia',      artist:'',           bpm:180, genre:'纯音乐', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,2]],[2.5,1],[3,3],[3.5,0],[4,1],[4.5,3],[5,0],[5.5,2],[6,[1,2]],[6.5,3],[7,0],[7.5,1]] },
+  { id:'aphasia',   name:'Aphasia',        artist:'',           bpm:150, genre:'纯音乐', pattern:[[0,0],[0.5,2],[1,1],[1.5,3],[2,[0,3]],[3,1],[3.5,2],[4,0],[4.5,1],[5,2],[5.5,3],[6,[0,1]],[7,2],[7.5,3]] },
+  { id:'burn',      name:'Burn',           artist:'',           bpm:140, genre:'纯音乐', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,1]],[3,2],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,2]],[7,1],[7.5,3]] },
+  { id:'spasmodic', name:'Spasmodic',      artist:'',           bpm:200, genre:'纯音乐', pattern:[[0,0],[0.25,2],[0.5,1],[0.75,3],[1,[0,1]],[1.5,2],[2,3],[2.5,0],[3,1],[3.5,2],[4,[0,3]],[4.5,1],[5,2],[5.5,3],[6,0],[6.5,1]] },
+  { id:'rrhari',    name:"Rrhar'il",       artist:'',           bpm:190, genre:'纯音乐', pattern:[[0,[0,3]],[0.5,1],[1,2],[1.5,0],[2,3],[2.5,1],[3,[0,2]],[3.5,3],[4,1],[4.5,0],[5,2],[5.5,3],[6,[1,2]],[6.5,0],[7,3],[7.5,1]] },
+  { id:'chongsheng',name:'重生',           artist:'',           bpm:130, genre:'纯音乐', pattern:[[0,0],[1,2],[2,[1,3]],[3,0],[4,2,'hold',2],[6,1],[7,3],[8,0],[9,1],[10,2,'slide',0],[11,3],[12,[1,2]],[13,0],[14,3]] },
+
+  /* ---------- 动漫 ---------- */
+  { id:'canoku',    name:'残酷天使的行动纲领',artist:'高桥洋子',bpm:128, genre:'动漫', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,2]],[2.5,1],[3,3],[3.5,0],[4,1],[4.5,2],[5,3],[5.5,0],[6,[1,2]],[6.5,3],[7,0],[7.5,1]] },
+  { id:'butterfly', name:'Butter-Fly',     artist:'和田光司',   bpm:165, genre:'动漫', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,0],[2.5,1],[3,2],[3.5,3],[4,[0,2]],[4.5,1],[5,3],[5.5,0],[6,2],[6.5,1],[7,3],[7.5,0]] },
+  { id:'qingniao',  name:'青鸟',           artist:'生物股长',   bpm:152, genre:'动漫', pattern:[[0,0],[0.5,2],[1,1],[1.5,3],[2,[0,1]],[3,2],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,3]],[7,1],[7.5,2]] },
+  { id:'gurenge',   name:'红莲华',         artist:'LiSA',       bpm:135, genre:'动漫', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,2]],[2.5,1],[3,3],[3.5,0],[4,1],[4.5,2],[5,[0,3]],[5.5,1],[6,2],[6.5,0],[7,3],[7.5,1],[8,[0,1]],[8.5,2],[9,3],[9.5,0],[10,2],[10.5,1],[11,3],[11.5,0]] },
+  { id:'shijie',    name:'直到世界尽头',   artist:'WANDS',      bpm:140, genre:'动漫', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,1]],[3,2],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,2]],[7,1],[7.5,3]] },
+  { id:'qianqian',  name:'前前前世',       artist:'RADWIMPS',   bpm:128, genre:'动漫', pattern:[[0,0],[0.5,2],[1,1],[1.5,3],[2,[0,3]],[3,1],[3.5,2],[4,0],[4.5,1],[5,2],[5.5,3],[6,[0,1]],[7,2],[7.5,3]] },
+  { id:'railgun',   name:'Only My Railgun',artist:'fripSide',   bpm:145, genre:'动漫', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,2]],[3,1],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,1]],[7,2],[7.5,0]] },
+  { id:'dashang',   name:'打上花火',       artist:'DAOKO',      bpm:96,  genre:'动漫', pattern:[[0,0],[1,2],[2,1,'hold',2],[4,3],[5,0],[6,[1,3]],[7,2],[8,0,'slide',2],[9,1],[10,3],[11,0],[12,[1,2]],[13,3],[14,0,'hold',3]] },
+  { id:'weare',     name:'We Are!',        artist:'',           bpm:160, genre:'动漫', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,1]],[3,2],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,3]],[7,1],[7.5,2]] },
+  { id:'daisuki',   name:'好想大声说爱你', artist:'BAAD',       bpm:150, genre:'动漫', pattern:[[0,0],[0.5,2],[1,1],[1.5,3],[2,[0,3]],[3,1],[3.5,2],[4,0],[4.5,1],[5,2],[5.5,3],[6,[0,2]],[7,1],[7.5,3]] },
+  { id:'pokemon',   name:'目标是神奇宝贝大师',artist:'松本梨香',bpm:140, genre:'动漫', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,2]],[2.5,1],[3,3],[3.5,0],[4,1],[4.5,2],[5,3],[5.5,0],[6,[1,2]],[6.5,3],[7,0],[7.5,1]] },
+  { id:'yueguang',  name:'月光传说',       artist:'',           bpm:130, genre:'动漫', pattern:[[0,0],[1,2],[2,[1,3]],[3,0],[4,2,'hold',2],[6,1],[7,3],[8,0],[9,1],[10,2,'slide',0],[11,3],[12,[1,2]],[13,0],[14,3]] },
+  { id:'gongshi',   name:'红莲的弓矢',     artist:'Linked Horizon',bpm:160,genre:'动漫',pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,1]],[3,2],[3.5,3],[4,0],[4.5,2],[5,1],[5.5,3],[6,[0,2]],[7,1],[7.5,3]] },
+  { id:'unravel',   name:'Unravel',        artist:'TK',         bpm:135, genre:'动漫', pattern:[[0,0],[0.5,1],[1,2],[1.5,3],[2,[0,1]],[2.5,2],[3,3],[3.5,0],[4,1],[4.5,3],[5,0],[5.5,2],[6,[1,2]],[6.5,3],[7,0],[7.5,1],[8,[0,3]],[8.5,2],[9,1],[9.5,0],[10,3],[10.5,1],[11,2],[11.5,0]] },
+  { id:'zhanfang',  name:'若能绽放光芒',   artist:'',           bpm:130, genre:'动漫', pattern:[[0,0],[1,2],[2,[1,3]],[3,0],[4,2,'hold',2],[6,1],[7,3],[8,0],[9,1],[10,2,'slide',0],[11,3],[12,[1,2]],[13,0],[14,3]] },
+];
+
+/* ============================== 2. 难度 ================================== */
+const DIFF = {
+  easy:    { speed:340, window:{perfect:.11,good:.20,ok:.30}, density:.55, mul:.8,  name:'简单' },
+  normal:  { speed:480, window:{perfect:.07,good:.14,ok:.22}, density:.85, mul:1.0, name:'普通' },
+  hard:    { speed:640, window:{perfect:.045,good:.10,ok:.16},density:1.0, mul:1.3, name:'困难' },
+  extreme: { speed:820, window:{perfect:.030,good:.07,ok:.12},density:1.0, mul:1.7, name:'极限' }
+};
+
+/* ============================== 3. DOM ================================== */
+const cv=document.getElementById('canvas'), ctx=cv.getContext('2d');
+const $=id=>document.getElementById(id);
+const flashEl=$('flash'), judgeEl=$('judge'), scoreEl=$('score'), comboEl=$('combo'),
+      sNameEl=$('songName'), sArtEl=$('songArtist'), progEl=$('progress'),
+      menuEl=$('menu'), songScroll=$('songScroll'), catRow=$('catRow'),
+      accFill=$('accFill'), accText=$('accText'), resultEl=$('result'),
+      pauseOverlay=$('pauseOverlay'), pauseBtn=$('pauseBtn');
+
+let W=0,H=0,DPR=Math.min(devicePixelRatio||1,2);
+function resize(){
+  W=cv.clientWidth; H=cv.clientHeight;
+  cv.width=W*DPR; cv.height=H*DPR;
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+addEventListener('resize',resize);
+
+/* ============================== 4. 成绩存档 ============================== */
+const STORE_KEY = 'rhythm_star_scores_v1';
+
+function loadScores(){
+  try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }
+  catch(e){ return {}; }
+}
+function saveScores(data){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(data)); } catch(e){}
+}
+function getBest(songId, diffKey){
+  const all = loadScores();
+  return (all[songId] && all[songId][diffKey]) || null;
+}
+function setBest(songId, diffKey, rec){
+  const all = loadScores();
+  if(!all[songId]) all[songId] = {};
+  const prev = all[songId][diffKey];
+  if(!prev || rec.score > prev.score){
+    all[songId][diffKey] = rec;
+    saveScores(all);
+    return true;   // 新纪录
+  }
+  return false;
+}
+// 评级工具
+const GRADE_COLORS = { 'Φ':'#ffd93b','S':'#00e5ff','A':'#a855f7','B':'#ff2e9a','C':'#4ade80','D':'#888' };
+function calcGrade(acc, miss){
+  if(acc>=99 && miss===0) return 'Φ';
+  if(acc>=96) return 'S';
+  if(acc>=92) return 'A';
+  if(acc>=85) return 'B';
+  if(acc>=75) return 'C';
+  return 'D';
+}
+
+/* ============================== 5. 状态 ================================== */
+const LANES=4, KEYS=['d','f','j','k'], COLORS=['#00e5ff','#a855f7','#ff2e9a','#ffd93b'];
+const G = {
+  running:false, paused:false,
+  song:null, diff:DIFF.normal, diffKey:'normal',
+  notes:[], startT:0, elapsed:0,
+  score:0, combo:0, maxCombo:0,
+  counts:{perfect:0,good:0,ok:0,miss:0},
+  laneFlash:[0,0,0,0], lanePress:[0,0,0,0],
+  stars:[], ripples:[], shockwaves:[],
+  lastBeat:-1, speed:480,
+  audio:null, useAudio:false,
+  judgeLineY:0, judgeLineTarget:0,
+  judgeLineAngle:0, judgeLineAngleTarget:0,
+  judgeLineX:0, judgeLineXTarget:0,
+  activeHolds:[], holdHeld:[null,null,null,null],
+  pointerLane:null,
+  currentCat:'全部'
+};
+
+/* ============================== 6. 曲库 UI =============================== */
+const CATS = ['全部', ...new Set(SONG_LIB.map(s=>s.genre))];
+let catFilter = '全部';
+
+function buildCats(){
+  catRow.innerHTML='';
+  CATS.forEach(c=>{
+    const b=document.createElement('button');
+    b.className='catBtn'+(c===catFilter?' active':'');
+    b.textContent=c;
+    b.onclick=()=>{catFilter=c;buildCats();buildMenu();};
+    catRow.appendChild(b);
+  });
+}
+function buildMenu(){
+  songScroll.innerHTML='';
+  SONG_LIB.filter(s=>catFilter==='全部'||s.genre===catFilter).forEach(s=>{
+    const b=document.createElement('button');
+    b.className='songBtn';
+    const lv = Math.min(15, Math.max(1, Math.round(s.bpm/18)+(s.pattern.length/14|0)));
+    const best = getBest(s.id, G.diffKey);
+    let bestLine = '无记录';
+    let gradeLine = '';
+    if(best){
+      bestLine = `最佳 ${best.score}`;
+      gradeLine = `<div class="grade" style="color:${GRADE_COLORS[best.grade]}">${best.grade}</div>`;
+    }
+    b.innerHTML = `<div class="t">${s.name}</div>
+      <div class="m">${s.artist||'未知'} · ${s.bpm}BPM</div>
+      <div class="best">${bestLine}</div>
+      <div class="lv">Lv.${lv}</div>${gradeLine}`;
+    b.onclick=()=>startGame(s);
+    songScroll.appendChild(b);
+  });
+}
+buildCats();
+buildMenu();
+
+document.querySelectorAll('.diffBtn').forEach(b=>{
+  b.onclick=()=>{
+    document.querySelectorAll('.diffBtn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    G.diffKey=b.dataset.diff; G.diff=DIFF[b.dataset.diff];
+    buildMenu();  // 刷新最佳成绩显示
+  };
+});
+
+/* ============================== 7. 谱面生成 ============================== */
+function buildNotes(song){
+  const d=G.diff, beat=60/song.bpm, notes=[];
+  song.pattern.forEach((ev,i)=>{
+    if(d.density<1 && i%Math.round(1/d.density)!==0 && i%4!==0) return;
+    const [b, lane, type, extra] = ev;
+    const t = b*beat + 1.5;
+    if(Array.isArray(lane)){
+      lane.forEach(L=>notes.push({t,lane:L,type:'tap',hit:false,judged:false}));
+    } else if(type==='hold'){
+      notes.push({t,lane,type:'hold',dur:(extra||1)*beat,hit:false,judged:false,
+                  holding:false,endT:t+(extra||1)*beat});
+    } else if(type==='slide'){
+      notes.push({t,lane,type:'slide',target:extra,hit:false,judged:false});
+    } else {
+      notes.push({t,lane,type:'tap',hit:false,judged:false});
+    }
+  });
+  notes.sort((a,b)=>a.t-b.t);
+  return notes;
+}
+
+/* ============================== 8. 开始/结束 ============================= */
+function startGame(song){
+  // 重置状态
+  G.song=song;
+  G.notes=buildNotes(song);
+  G.speed=G.diff.speed;
+  Object.assign(G, {
+    score:0, combo:0, maxCombo:0,
+    counts:{perfect:0,good:0,ok:0,miss:0},
+    stars:[], ripples:[], shockwaves:[],
+    laneFlash:[0,0,0,0], lanePress:[0,0,0,0],
+    activeHolds:[], holdHeld:[null,null,null,null],
+    lastBeat:-1, elapsed:0, paused:false, running:true
+  });
+  G.startT=performance.now();
+
+  if(G.audio){G.audio.pause();G.audio=null;}
+  G.useAudio=false;
+
+  sNameEl.textContent=song.name;
+  sArtEl.textContent=(song.artist||'未知')+' · '+(song.genre||'')+' · '+G.diff.name;
+  scoreEl.textContent='0';
+  comboEl.textContent='COMBO 0';
+  comboEl.classList.remove('hot');
+  accText.textContent='ACC 100.0%';
+  accFill.style.width='100%';
+  menuEl.classList.add('hidden');
+  resultEl.classList.remove('show');
+  pauseOverlay.classList.remove('show');
+
+  resize();
+  const baseY=H-Math.max(110,H*0.14);
+  G.judgeLineY=baseY; G.judgeLineTarget=baseY;
+  G.judgeLineAngle=0; G.judgeLineAngleTarget=0;
+  G.judgeLineX=W/2; G.judgeLineXTarget=W/2;
+
+  // 音频
+  const a=new Audio();
+  a.src=song.id+'.mp3';
+  a.oncanplaythrough=()=>{
+    if(G.song===song&&G.running){
+      G.audio=a; G.useAudio=true;
+      a.currentTime=0;
+      a.play().catch(()=>{});
+    }
+  };
+  a.onerror=()=>{};
+  a.load();
+
+  requestAnimationFrame(loop);
+}
+
+function endGame(){
+  G.running=false;
+  if(G.audio){G.audio.pause();G.audio=null;}
+  const c=G.counts, total=c.perfect+c.good+c.ok+c.miss;
+  const acc=total?((c.perfect+c.good*.75+c.ok*.5)/total*100):0;
+  const grade = calcGrade(acc, c.miss);
+
+  // 存档
+  const rec = { score:G.score, grade, acc:+acc.toFixed(2),
+                maxCombo:G.maxCombo, counts:{...c}, time:Date.now() };
+  const isNew = setBest(G.song.id, G.diffKey, rec);
+
+  $('resName').textContent=G.song.name;
+  $('resScore').textContent=G.score;
+  $('cPerfect').textContent=c.perfect;
+  $('cGood').textContent=c.good;
+  $('cOk').textContent=c.ok;
+  $('cMiss').textContent=c.miss;
+  $('cCombo').textContent=G.maxCombo;
+  $('cAcc').textContent=acc.toFixed(2)+'%';
+  $('newRecord').textContent = isNew ? '★ 新纪录 ★' : '';
+  const g=$('resGrade'); g.textContent=grade; g.style.color=GRADE_COLORS[grade];
+  resultEl.classList.add('show');
+  buildMenu();   // 刷新最佳成绩
+}
+
+$('btnRetry').onclick=()=>{resultEl.classList.remove('show');startGame(G.song);};
+$('btnBack').onclick=()=>{
+  resultEl.classList.remove('show');menuEl.classList.remove('hidden');
+  if(G.audio){G.audio.pause();G.audio=null;}
+  G.running=false;
+};
+
+/* ============================== 9. 暂停系统 ============================== */
+function pauseGame(){
+  if(!G.running||G.paused)return;
+  G.paused=true;
+  if(G.audio)G.audio.pause();
+  pauseOverlay.classList.add('show');
+}
+function resumeGame(){
+  if(!G.running||!G.paused)return;
+  G.paused=false;
+  G.startT=performance.now()-G.elapsed*1000;
+  if(G.audio)G.audio.play().catch(()=>{});
+  pauseOverlay.classList.remove('show');
+  requestAnimationFrame(loop);
+}
+function quitToMenu(){
+  G.running=false;G.paused=false;
+  if(G.audio){G.audio.pause();G.audio=null;}
+  pauseOverlay.classList.remove('show');
+  resultEl.classList.remove('show');
+  menuEl.classList.remove('hidden');
+  buildMenu();
+}
+pauseBtn.onclick=pauseGame;
+$('pResume').onclick=resumeGame;
+$('pRestart').onclick=()=>{pauseOverlay.classList.remove('show');startGame(G.song);};
+$('pQuit').onclick=quitToMenu;
+
+/* ============================== 10. 输入 ================================ */
+const keyState={};
+function laneAt(x){
+  const pad=W*0.06, fw=W-pad*2, lw=fw/LANES;
+  return Math.max(0,Math.min(LANES-1,Math.floor((x-pad)/lw)));
+}
+
+addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(k==='escape'){
+    if(G.paused) resumeGame();
+    else if(G.running) pauseGame();
+    else if(!menuEl.classList.contains('hidden')) return;
+    return;
+  }
+  if(k==='p'){ if(G.running){ G.paused?resumeGame():pauseGame(); } return; }
+  if(k==='r'){ if(G.song){ resultEl.classList.remove('show'); pauseOverlay.classList.remove('show'); startGame(G.song);} return; }
+  if(k===' '){ e.preventDefault(); return; }
+  if(!G.running||G.paused||keyState[k])return;
+  const lane=KEYS.indexOf(k);
+  if(lane>=0){ keyState[k]=true; pressLane(lane); }
+});
+addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  keyState[k]=false;
+  const lane=KEYS.indexOf(k);
+  if(lane>=0) releaseLane(lane);
+});
+
+cv.addEventListener('pointerdown',e=>{
+  if(!G.running||G.paused)return;
+  const lane=laneAt(e.clientX);
+  G.pointerLane=lane;
+  pressLane(lane);
+});
+cv.addEventListener('pointermove',e=>{
+  if(!G.running||G.paused||G.pointerLane===null)return;
+  const lane=laneAt(e.clientX);
+  if(lane!==G.pointerLane){
+    releaseLane(G.pointerLane);
+    G.pointerLane=lane;
+    pressLane(lane);
+  }
+});
+addEventListener('pointerup',()=>{
+  if(G.pointerLane!==null){releaseLane(G.pointerLane);G.pointerLane=null;}
+});
+
+/* ============================== 11. 判定 ================================ */
+function pressLane(lane){
+  G.laneFlash[lane]=1; G.lanePress[lane]=1;
+  const t=G.elapsed, win=G.diff.window;
+  let best=null,bestDt=Infinity;
+  for(const n of G.notes){
+    if(n.lane!==lane||n.judged)continue;
+    const dt=n.t-t, adt=Math.abs(dt);
+    if(adt<bestDt&&adt<=win.ok){best=n;bestDt=adt;}
+    if(n.t-t>win.ok)break;
+  }
+  if(!best){
+    G.holdHeld[lane]=null;
+    spawnRipple(lane,'#556',.4);
+    return;
+  }
+  let type='ok';
+  if(bestDt<=win.perfect)type='perfect';
+  else if(bestDt<=win.good)type='good';
+
+  if(best.type==='hold'){
+    best.judged=true; best.holding=true; best.holdProgress=0;
+    G.holdHeld[lane]=best;
+    G.activeHolds.push(best);
+    registerHit(type,lane,'holdHead');
+  } else {
+    best.judged=true; best.hit=true;
+    registerHit(type,lane,best.type);
+    if(best.type==='slide')spawnSlideTrail(best);
+  }
+}
+
+function releaseLane(lane){
+  G.lanePress[lane]=0;
+  const h=G.holdHeld[lane];
+  if(h){
+    const t=G.elapsed;
+    if(t<h.endT-G.diff.window.ok){
+      h.judged=true; h.holding=false;
+      G.combo=0; G.counts.miss++;
+      comboEl.textContent='COMBO 0';
+      comboEl.classList.remove('hot');
+      showJudge('MISS','#ff3355');
+    } else {
+      h.holding=false; h.judged=true;
+    }
+    G.holdHeld[lane]=null;
+  }
+}
+
+function registerHit(type,lane,kind){
+  const base={perfect:300,good:200,ok:100}[type];
+  G.combo++;
+  G.maxCombo=Math.max(G.maxCombo,G.combo);
+  const cb=Math.min(G.combo,150)*2;
+  G.score+=Math.round((base+cb)*G.diff.mul);
+  G.counts[type]++;
+
+  const col={perfect:'#00e5ff',good:'#a855f7',ok:'#ffd93b'}[type];
+  const txt={perfect:'PERFECT',good:'GOOD',ok:'OK'}[type];
+  showJudge(txt,col);
+  spawnRipple(lane,col,1);
+  spawnStarBurst(lane,col,type==='perfect'?26:type==='good'?16:10);
+  if(kind==='slide')spawnSlideTrail({lane});
+
+  scoreEl.textContent=G.score;
+  comboEl.textContent='COMBO '+G.combo;
+  comboEl.classList.toggle('hot',G.combo>=10);
+
+  if(type==='perfect'){flash(.4);spawnShockwave(lane,col);}
+  updateAcc();
+}
+
+function registerMiss(note){
+  G.combo=0; G.counts.miss++;
+  comboEl.textContent='COMBO 0';
+  comboEl.classList.remove('hot');
+  showJudge('MISS','#ff3355');
+  spawnRipple(note.lane,'#ff3355',.7);
+  updateAcc();
+}
+
+function updateAcc(){
+  const c=G.counts, total=c.perfect+c.good+c.ok+c.miss;
+  if(!total)return;
+  const acc=(c.perfect+c.good*.75+c.ok*.5)/total*100;
+  accText.textContent='ACC '+acc.toFixed(1)+'%';
+  accFill.style.width=acc+'%';
+}
+
+/* ============================== 12. 特效 ================================ */
+let judgeTimer=0;
+function showJudge(text,color){
+  judgeEl.textContent=text;
+  judgeEl.style.color=color;
+  judgeEl.style.textShadow=`0 0 30px ${color}, 0 0 70px ${color}`;
+  judgeEl.style.opacity='1';
+  judgeEl.style.transform='translateX(-50%) scale(1.18)';
+  judgeTimer=.45;
+}
+function flash(p){
+  flashEl.style.transition='opacity .05s';
+  flashEl.style.opacity=String(p);
+  setTimeout(()=>{flashEl.style.transition='opacity .28s';flashEl.style.opacity='0';},60);
+}
+function laneCX(lane){
+  const pad=W*0.06, fw=W-pad*2, lw=fw/LANES;
+  return pad+lw*(lane+.5);
+}
+function spawnRipple(lane,color,power){
+  G.ripples.push({lane,color,power,life:1,x:laneCX(lane),y:G.judgeLineY});
+}
+function spawnShockwave(lane,color){
+  G.shockwaves.push({x:laneCX(lane),y:G.judgeLineY,color,life:1,r:10});
+}
+function spawnStarBurst(lane,color,count){
+  const x=laneCX(lane), y=G.judgeLineY;
+  for(let i=0;i<count;i++){
+    const ang=Math.random()*Math.PI*2;
+    const sp=80+Math.random()*340;
+    G.stars.push({
+      x,y, vx:Math.cos(ang)*sp, vy:Math.sin(ang)*sp-160,
+      life:1,color, size:3+Math.random()*6,
+      rot:Math.random()*Math.PI*2, rotSp:(Math.random()-.5)*10,
+      shape:Math.random()<.6?'star':'dot'
+    });
+  }
+}
+function spawnSlideTrail(note){
+  const c=COLORS[note.lane];
+  for(let i=0;i<8;i++){
+    G.stars.push({
+      x:laneCX(note.lane),y:G.judgeLineY,
+      vx:(Math.random()-.5)*80,vy:-Math.random()*160-40,
+      life:1,color:c,size:2+Math.random()*3,
+      rot:0,rotSp:0,shape:'dot'
+    });
+  }
+}
+
+/* ============================== 13. 主循环 ============================== */
+let lastFrame=0;
+function loop(now){
+  if(!G.running||G.paused)return;
+  if(!lastFrame)lastFrame=now;
+  const dt=Math.min((now-lastFrame)/1000,.05);
+  lastFrame=now;
+
+  if(G.useAudio&&G.audio&&!G.audio.paused){
+    G.elapsed=G.audio.currentTime;
+  } else {
+    G.elapsed=(now-G.startT)/1000;
+  }
+
+  update(dt);
+  render();
+
+  const last=G.notes[G.notes.length-1];
+  if(last&&G.elapsed>last.endT+2.5){endGame();return;}
+  if(!G.useAudio&&G.elapsed>60){endGame();return;}
+
+  requestAnimationFrame(loop);
+}
+
+function update(dt){
+  const win=G.diff.window;
+
+  for(const n of G.notes){
+    if(n.judged)continue;
+    if(n.type==='hold'){
+      if(!n.holding && G.elapsed-n.t>win.ok){ n.judged=true; registerMiss(n); }
+    } else {
+      if(G.elapsed-n.t>win.ok){ n.judged=true; registerMiss(n); }
+    }
+  }
+
+  for(const h of G.activeHolds){
+    if(!h.holding||!h.judged)continue;
+    if(G.elapsed>=h.endT){
+      h.holding=false;
+      const lane=h.lane;
+      if(G.holdHeld[lane]===h){
+        G.combo++;
+        G.maxCombo=Math.max(G.maxCombo,G.combo);
+        G.score+=Math.round((400+Math.min(G.combo,150)*2)*G.diff.mul);
+        G.counts.perfect++;
+        showJudge('PERFECT','#00e5ff');
+        spawnStarBurst(lane,'#00e5ff',20);
+        flash(.35);
+        scoreEl.textContent=G.score;
+        comboEl.textContent='COMBO '+G.combo;
+        comboEl.classList.toggle('hot',G.combo>=10);
+        updateAcc();
+      }
+    }
+  }
+  G.activeHolds=G.activeHolds.filter(h=>h.holding);
+
+  if(G.song){
+    const beat=60/G.song.bpm;
+    const beatIdx=Math.floor(G.elapsed/beat);
+    if(beatIdx!==G.lastBeat&&G.elapsed>0){
+      G.lastBeat=beatIdx;
+      flash(beatIdx%4===0?.18:.08);
+      if(beatIdx%4===0){
+        const baseY=H-Math.max(110,H*0.14);
+        G.judgeLineTarget=baseY+(Math.random()-.5)*H*0.08;
+        G.judgeLineAngleTarget=(Math.random()-.5)*0.10;
+        G.judgeLineXTarget=W/2+(Math.random()-.5)*W*0.10;
+      }
+    }
+    G.judgeLineY+=(G.judgeLineTarget-G.judgeLineY)*Math.min(1,dt*2.6);
+    G.judgeLineAngle+=(G.judgeLineAngleTarget-G.judgeLineAngle)*Math.min(1,dt*2.6);
+    G.judgeLineX+=(G.judgeLineXTarget-G.judgeLineX)*Math.min(1,dt*2.6);
+  }
+
+  if(judgeTimer>0){
+    judgeTimer-=dt;
+    if(judgeTimer<=0)judgeEl.style.opacity='0';
+    else{
+      const p=judgeTimer/.45;
+      judgeEl.style.opacity=String(Math.min(1,p*2));
+      judgeEl.style.transform=`translateX(-50%) scale(${1+(1-p)*.12})`;
+    }
+  }
+
+  for(let i=0;i<LANES;i++){
+    G.laneFlash[i]=Math.max(0,G.laneFlash[i]-dt*3.5);
+    G.lanePress[i]=Math.max(0,G.lanePress[i]-dt*5);
+  }
+
+  G.stars=G.stars.filter(s=>{
+    s.life-=dt*1.6;
+    s.x+=s.vx*dt; s.y+=s.vy*dt;
+    s.vy+=580*dt; s.vx*=.985;
+    s.rot+=s.rotSp*dt;
+    return s.life>0;
+  });
+  G.ripples=G.ripples.filter(r=>{
+    r.life-=dt*2.4; r.x=laneCX(r.lane); r.y=G.judgeLineY;
+    return r.life>0;
+  });
+  G.shockwaves=G.shockwaves.filter(s=>{
+    s.life-=dt*1.8; s.r+=260*dt;
+    return s.life>0;
+  });
+
+  const last=G.notes[G.notes.length-1];
+  const total=last?(last.endT||last.t)+1:1;
+  progEl.style.width=Math.min(100,G.elapsed/total*100)+'%';
+}
+
+/* ============================== 14. 渲染 ================================ */
+function render(){
+  ctx.clearRect(0,0,W,H);
+  const pad=W*0.06, fw=W-pad*2, lw=fw/LANES;
+  const jy=G.judgeLineY, ang=G.judgeLineAngle, jx=G.judgeLineX;
+
+  for(let i=0;i<LANES;i++){
+    const x=pad+i*lw, c=COLORS[i];
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'rgba(255,255,255,0)');
+    g.addColorStop(.55,hexA(c,.03+G.laneFlash[i]*.15));
+    g.addColorStop(1,hexA(c,.02+G.laneFlash[i]*.10));
+    ctx.fillStyle=g; ctx.fillRect(x,0,lw,H);
+
+    ctx.strokeStyle=hexA(c,.10+G.laneFlash[i]*.55);
+    ctx.lineWidth=1.4;
+    ctx.beginPath();ctx.moveTo(x+.5,0);ctx.lineTo(x+.5,H);ctx.stroke();
+  }
+  ctx.strokeStyle=hexA(COLORS[3],.10);
+  ctx.beginPath();ctx.moveTo(pad+fw,0);ctx.lineTo(pad+fw,H);ctx.stroke();
+
+  const speed=G.speed;
+  for(const n of G.notes){
+    if(n.judged&&!n.hit&&n.type!=='hold')continue;
+    const dtJ=n.t-G.elapsed;
+
+    if(n.type==='hold'){
+      const yHead=jy-dtJ*speed;
+      const yTail=jy-(n.endT-G.elapsed)*speed;
+      if(yTail<-100||yHead>H+100)continue;
+      const x=pad+n.lane*lw, cx=x+lw/2, w=lw*.72, c=COLORS[n.lane];
+      const topY=Math.min(yHead,yTail), botY=Math.max(yHead,yTail);
+      const grd=ctx.createLinearGradient(0,topY,0,botY);
+      grd.addColorStop(0,hexA(c,.15));
+      grd.addColorStop(.5,hexA(c,.45));
+      grd.addColorStop(1,hexA(c,.15));
+      ctx.save();ctx.shadowColor=c;ctx.shadowBlur=18;
+      ctx.fillStyle=grd; roundRect(ctx,cx-w/2,topY,w,botY-topY,10); ctx.fill();
+      ctx.restore();
+      drawNoteBlock(cx,yHead,w,22,c,true);
+      drawNoteBlock(cx,yTail,w,14,hexA(c,.9),false);
+      continue;
+    }
+
+    if(n.type==='slide'){
+      const y=jy-dtJ*speed;
+      if(y<-80||y>H+80)continue;
+      const x=pad+n.lane*lw, cx=x+lw/2, w=lw*.7, c=COLORS[n.lane];
+      drawNoteBlock(cx,y,w,20,c,false);
+      const dir=Math.sign(n.target-n.lane)||1;
+      ctx.save();
+      ctx.strokeStyle=c;ctx.lineWidth=3;
+      ctx.shadowColor=c;ctx.shadowBlur=20;
+      ctx.beginPath();
+      ctx.moveTo(cx+dir*10,y); ctx.lineTo(cx+dir*30,y);
+      ctx.lineTo(cx+dir*24,y-7); ctx.moveTo(cx+dir*30,y); ctx.lineTo(cx+dir*24,y+7);
+      ctx.stroke();
+      ctx.restore();
+      continue;
+    }
+
+    const y=jy-dtJ*speed;
+    if(y<-80||y>H+80)continue;
+    const x=pad+n.lane*lw, cx=x+lw/2, w=lw*.78, c=COLORS[n.lane];
+    drawNoteBlock(cx,y,w,20,c,false);
+  }
+
+  ctx.save();
+  ctx.translate(jx,jy);ctx.rotate(ang);ctx.translate(-jx,-jy);
+  const jl=ctx.createLinearGradient(pad,0,pad+fw,0);
+  jl.addColorStop(0,hexA(COLORS[0],.95));
+  jl.addColorStop(.33,hexA(COLORS[1],.95));
+  jl.addColorStop(.66,hexA(COLORS[2],.95));
+  jl.addColorStop(1,hexA(COLORS[3],.95));
+  ctx.shadowColor='#fff';ctx.shadowBlur=28;
+  ctx.strokeStyle=jl;ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(pad,jy);ctx.lineTo(pad+fw,jy);ctx.stroke();
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(jx,jy);ctx.rotate(ang);ctx.translate(-jx,-jy);
+  const bandG=ctx.createLinearGradient(0,jy-46,0,jy+46);
+  bandG.addColorStop(0,'rgba(255,255,255,0)');
+  bandG.addColorStop(.5,'rgba(255,255,255,.11)');
+  bandG.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=bandG; ctx.fillRect(pad,jy-46,fw,92);
+  ctx.restore();
+
+  for(let i=0;i<LANES;i++){
+    if(G.lanePress[i]<=0)continue;
+    const x=pad+i*lw,c=COLORS[i],p=G.lanePress[i];
+    const g=ctx.createLinearGradient(0,jy,0,jy-300*p);
+    g.addColorStop(0,hexA(c,.6*p)); g.addColorStop(1,hexA(c,0));
+    ctx.fillStyle=g; ctx.fillRect(x,jy-300*p,lw,300*p);
+    ctx.save();ctx.shadowColor=c;ctx.shadowBlur=46;
+    ctx.strokeStyle=hexA(c,p);ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(x+lw/2,jy,16+(1-p)*52,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
+  }
+
+  for(const r of G.ripples){
+    const rad=18+(1-r.life)*115;
+    ctx.save();
+    ctx.globalAlpha=r.life*.85;
+    ctx.strokeStyle=r.color;ctx.shadowColor=r.color;ctx.shadowBlur=26;
+    ctx.lineWidth=3*r.power;
+    ctx.beginPath();ctx.arc(r.x,r.y,rad,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
+  }
+
+  for(const s of G.shockwaves){
+    ctx.save();
+    ctx.globalAlpha=s.life*.6;
+    ctx.strokeStyle=s.color;ctx.shadowColor=s.color;ctx.shadowBlur=30;
+    ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.stroke();
+    ctx.restore();
+  }
+
+  for(const s of G.stars){
+    ctx.save();
+    ctx.globalAlpha=Math.max(0,s.life);
+    ctx.translate(s.x,s.y); ctx.rotate(s.rot);
+    ctx.fillStyle=s.color; ctx.shadowColor=s.color; ctx.shadowBlur=20;
+    if(s.shape==='star') drawStar(ctx,0,0,5,s.size*s.life,s.size*.45*s.life);
+    else { ctx.beginPath();ctx.arc(0,0,s.size*s.life,0,Math.PI*2);ctx.fill(); }
+    ctx.restore();
+  }
+
+  ctx.font='700 13px "PingFang SC",sans-serif';
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  for(let i=0;i<LANES;i++){
+    const x=laneCX(i),c=COLORS[i],act=G.lanePress[i]>.05;
+    ctx.save();
+    ctx.globalAlpha=act?1:.3;
+    ctx.fillStyle=c;ctx.shadowColor=c;ctx.shadowBlur=act?24:0;
+    ctx.fillText(KEYS[i].toUpperCase(),x,jy+50);
+    ctx.restore();
+  }
+}
+
+function drawNoteBlock(cx,cy,w,h,color,isHead){
+  ctx.save();
+  ctx.shadowColor=color;ctx.shadowBlur=isHead?32:22;
+  const g=ctx.createLinearGradient(cx-w/2,cy,cx+w/2,cy);
+  g.addColorStop(0,hexA(color,.4));
+  g.addColorStop(.5,color);
+  g.addColorStop(1,hexA(color,.4));
+  ctx.fillStyle=g;
+  roundRect(ctx,cx-w/2,cy-h/2,w,h,isHead?11:8);
+  ctx.fill();ctx.restore();
+  ctx.fillStyle='rgba(255,255,255,.6)';
+  roundRect(ctx,cx-w/2+4,cy-h/2+3,w-8,Math.max(3,h*.22),3);
+  ctx.fill();
+}
+function drawStar(c,x,y,spikes,outer,inner){
+  let rot=-Math.PI/2; const step=Math.PI/spikes;
+  c.beginPath();
+  c.moveTo(x+Math.cos(rot)*outer,y+Math.sin(rot)*outer);
+  for(let i=0;i<spikes;i++){
+    rot+=step; c.lineTo(x+Math.cos(rot)*inner,y+Math.sin(rot)*inner);
+    rot+=step; c.lineTo(x+Math.cos(rot)*outer,y+Math.sin(rot)*outer);
+  }
+  c.closePath();c.fill();
+}
+
+/* ============================== 15. 工具 ================================ */
+function roundRect(c,x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);
+  c.beginPath();
+  c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r);
+  c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r);
+  c.arcTo(x,y,x+w,y,r);
+  c.closePath();
+}
+function hexA(hex,a){
+  if(hex.startsWith('rgba'))return hex;
+  const n=parseInt(hex.slice(1),16);
+  return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+}
+
+resize();
+</script>
+</body>
+</html>
